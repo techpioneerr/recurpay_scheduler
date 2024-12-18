@@ -1,0 +1,121 @@
+import sqlite3
+from datetime import datetime, timedelta
+import time
+
+# Initialize database
+def initialize_db():
+    conn = sqlite3.connect('recurpay.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            description TEXT,
+            amount REAL,
+            due_date TEXT,
+            recurrence_interval INTEGER
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Add a new recurring payment
+def add_payment(description, amount, due_date, recurrence_interval):
+    conn = sqlite3.connect('recurpay.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO payments (description, amount, due_date, recurrence_interval)
+        VALUES (?, ?, ?, ?)
+    ''', (description, amount, due_date, recurrence_interval))
+    conn.commit()
+    conn.close()
+    print(f"\n🚀 Payment '{description}' has been scheduled successfully!")
+
+# Check and handle due payments
+def check_due_payments():
+    conn = sqlite3.connect('recurpay.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM payments')
+    payments = cursor.fetchall()
+    conn.close()
+
+    today = datetime.now().date()
+    print("\n🔍 Checking for due payments...")
+    due_found = False
+
+    for payment in payments:
+        payment_id, description, amount, due_date, recurrence_interval = payment
+        due_date = datetime.strptime(due_date, '%Y-%m-%d').date()
+
+        if due_date <= today:
+            print(f"\n💳 Payment Due: {description}")
+            print(f"   Amount: ${amount:.2f}")
+            print(f"   Due Date: {due_date}")
+            due_found = True
+
+            # Reschedule the next payment
+            next_due_date = due_date + timedelta(days=recurrence_interval)
+            update_due_date(payment_id, next_due_date)
+
+    if not due_found:
+        print("\n✅ No payments are due today!")
+
+# Update the due date of a payment
+def update_due_date(payment_id, next_due_date):
+    conn = sqlite3.connect('recurpay.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE payments
+        SET due_date = ?
+        WHERE id = ?
+    ''', (next_due_date.strftime('%Y-%m-%d'), payment_id))
+    conn.commit()
+    conn.close()
+    print(f"🔄 Payment rescheduled to {next_due_date.strftime('%Y-%m-%d')}.")
+
+# Display all scheduled payments
+def display_payments():
+    conn = sqlite3.connect('recurpay.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM payments')
+    payments = cursor.fetchall()
+    conn.close()
+
+    print("\n📅 Scheduled Payments:")
+    if payments:
+        for payment in payments:
+            print(f"- {payment[1]} | ${payment[2]:.2f} | Next Due: {payment[3]} | Every {payment[4]} days")
+    else:
+        print("   No payments scheduled yet!")
+
+# Main application flow
+def main():
+    initialize_db()
+
+    while True:
+        print("\n✨ Welcome to RecurPay Web3 Scheduler ✨")
+        print("1. Add a New Payment")
+        print("2. Check Due Payments")
+        print("3. View Scheduled Payments")
+        print("4. Exit")
+        choice = input("\nEnter your choice: ")
+
+        if choice == '1':
+            description = input("\nEnter payment description: ")
+            amount = float(input("Enter payment amount: "))
+            due_date = input("Enter due date (YYYY-MM-DD): ")
+            recurrence_interval = int(input("Enter recurrence interval (days): "))
+            add_payment(description, amount, due_date, recurrence_interval)
+        elif choice == '2':
+            check_due_payments()
+        elif choice == '3':
+            display_payments()
+        elif choice == '4':
+            print("\n🌟 Thank you for using RecurPay Web3 Scheduler. Goodbye!")
+            break
+        else:
+            print("\n❌ Invalid choice! Please select a valid option.")
+
+        time.sleep(1)
+
+if __name__ == '__main__':
+    main()
